@@ -152,12 +152,8 @@ fn convert_to_gml(source_name: &str, layer_name: &str, format: &str) -> Result<S
 fn handle_single_file(file: &params::File) -> Option<TempFile> {
     let file_name = file.filename.clone().unwrap();
     let parts = file_name.split(".").collect::<Vec<&str>>();
-    // let random_name = format!("{}", Uuid::new_v4()).replace("-", "");
-    // let destination_file = &{ "/tmp/".to_string() + &random_name + "." + parts[1]};
-    // mv_file(file.path.to_str().unwrap(), destination_file);
     Some(TempFile {
         path: file.path.to_str().unwrap().to_string(),
-        // path: destination_file.to_string(),
         name: parts[0].to_string(),
         multiple_file: false })
 
@@ -210,14 +206,14 @@ fn get_output_format(req: &mut Request) -> (String, Mime) {
 // Dispatch between reading one or multiple file, return the suitable path to be used by ogr2ogr:
 fn get_uploaded_filename(req: &mut Request, param_name: &str) -> Option<TempFile> {
     match req.get_ref::<Params>().unwrap().find(&[param_name]) {
-        // Handle multiple files in an array:
         Some(&Value::Array(ref files)) => {
+            // Handle single file in an array:
             if files.len() == 1 {
                 match files.get(0) {
                     Some(&Value::File(ref file)) => handle_single_file(file),
                     _ => None
                 }
-            // Handle single file in an array:
+            // Handle multiple files in an array:
             } else { handle_multiple_files(files) }
         },
         // Handle single file:
