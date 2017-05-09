@@ -1,0 +1,20 @@
+[package]
+name = "webapprustdemo"
+version = "0.1.0"
+authors = ["mthh <>"]
+
+[dependencies]
+env_logger = "*"
+handlebars-iron = "*"
+lazy_static = "0.2.8"
+logger = "*"
+mime = "*"
+mount = "*"
+iron = "0.5.1"
+params = "*"
+router = "*"
+serde = "^1.0"
+serde_json = "^1.0"
+serde_derive = "^1.0"
+staticfile = "*"
+uuid = { version = "0.4", features = ["v4"] }

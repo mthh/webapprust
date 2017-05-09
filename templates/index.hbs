@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Convert to geographic layer</title>
+  <link href='static/index.css' rel='stylesheet' type='text/css'>
+  <link href='https://fonts.googleapis.com/css?family=Source+Code+Pro:400,700' rel='stylesheet' type='text/css'>
+</head>
+<body>
+<h1>Convert to <b>GML/GeoJSON</b> as a service</h1>
+<br>
+<p>
+  Easy to use, just ask curl&hellip;
+</p>
+<pre>curl -F "file=@/path/to/file.geojson" \
+      -F "output=GML" \
+      http://localhost:3000/convert \
+      > file.gml </pre>
+<p>
+  &hellip;and it returns your file translated to <i>GeoJSON</i> or <i>Geographic Markup Language</i> format.
+<i>(Output format defaults to GML if not specified)</i>
+</p>
+<p>
+Also accept multiple files for Shapefile format :
+</p>
+<pre>curl -F "file[]=@file.shp" \
+      -F "file[]=@file.dbf" \
+      -F "file[]=@file.shx" \
+      -F "file[]=@file.prj" \
+      -F "output=GeoJSON" \
+      http://localhost:3000/convert \
+      > my_result_file.geojson</pre>
+<p>
+  Or use that form:
+</p>
+<form action="/convert" method="post" enctype="multipart/form-data">
+  <input type="file" name="file[]" accept=".shp,.dbf,.shx,.cpg,.prj,.kml,.geojson,.gml" multiple><br>
+  <input type="radio" name="output" value="GeoJSON" checked> GeoJSON<br>
+  <input type="radio" name="output" value="GML"> GML<br>
+  <br>
+  <button type="submit">Send</button>
+</form>
+<br>
+<p id="version_info">Version {{version}}</p>
+<p> Based on <i>{{gdal_version}}</i></p>
+</body>
+</html>
