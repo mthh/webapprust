@@ -39,9 +39,9 @@ struct TempFile {
     multiple_file: bool
 }
 
-const CONTENT_FAILED : &'static str = "<html><body><div><h1>Conversion failed</h1></div></body></html>";
+const CONTENT_FAILED : &str = "<html><body><div><h1>Conversion failed</h1></div></body></html>";
 
-const CONTENT_404 : &'static str = r#"<html>
+const CONTENT_404 : &str = r#"<html>
     <body>
     <h1>Error 404</h1>
     <p>Ressource not found</p>
@@ -52,8 +52,8 @@ struct Custom404;
 
 impl AfterMiddleware for Custom404 {
     fn catch(&self, _: &mut Request, err: IronError) -> IronResult<Response> {
-        if let Some(_) = err.error.downcast::<NoRoute>() {
-            Ok(Response::with((ContentType::html().0, status::NotFound, CONTENT_404)))
+        if err.error.is::<NoRoute>() {
+            Ok(Response::with((status::NotFound, CONTENT_404)))
         } else {
             println!("{:?}", err);
             Err(err)
@@ -63,13 +63,13 @@ impl AfterMiddleware for Custom404 {
 
 fn main() {
     // Logging:
-    env_logger::init().unwrap();
+    env_logger::init();
     let logger = Logger::new(None);
 
     // Templates:
     let mut hbse = HandlebarsEngine::new();
     hbse.add(Box::new(DirectorySource::new("./templates", ".hbs")));
-    if let Err(_) = hbse.reload() {
+    if hbse.reload().is_err() {
         panic!("Unable to build templates");
     }
 
@@ -88,7 +88,7 @@ fn main() {
     chain.link(logger);
     chain.link_after(hbse);
     chain.link_after(Custom404);
-    Iron::new(chain).http("localhost:3000").unwrap();
+    Iron::new(chain).http("localhost:3000").expect("Unable to launch server on localhost:3000");
 
     // Handle index page with handlebars:
     fn welcome(_: &mut Request) -> IronResult<Response> {
@@ -116,7 +116,9 @@ fn main() {
         match convert_to_gml(&f.path, &f.name, format.as_str()) {
             Ok(result) => {
                 if f.multiple_file {
-                    remove_files(&f.path)
+                    remove_files(&f.path).unwrap_or_else(|_|{
+                        println!("Something went wrong while removing temporary files");
+                    });
                 }
                 Ok(Response::with((mime_type, status::Ok, result)))
             },
@@ -151,7 +153,7 @@ fn convert_to_gml(source_name: &str, layer_name: &str, format: &str) -> Result<S
 // Return the path to the temporaty file to convert and it's original name:
 fn handle_single_file(file: &params::File) -> Option<TempFile> {
     let file_name = file.filename.clone().unwrap();
-    let parts = file_name.split(".").collect::<Vec<&str>>();
+    let parts = file_name.split('.').collect::<Vec<&str>>();
     Some(TempFile {
         path: file.path.to_str().unwrap().to_string(),
         name: parts[0].to_string(),
@@ -160,27 +162,24 @@ fn handle_single_file(file: &params::File) -> Option<TempFile> {
 }
 
 // Handle shapefile:
-fn handle_multiple_files(files: &Vec<params::Value>) -> Option<TempFile> {
+fn handle_multiple_files(files: &[params::Value]) -> Option<TempFile> {
     let mut is_shapefile = false;
     let (mut path, mut real_name) = (String::from(""), String::from(""));
     let random_name = format!("{}", Uuid::new_v4()).replace("-", "");
     for f in files {
-        match f {
-            &Value::File(ref file) => {
-                let file_name = file.filename.clone().unwrap();
-                let parts = file_name.split(".").collect::<Vec<&str>>();
-                let destination_file = &{ String::from("/tmp/") + &random_name + "." + parts[1]};
-                // Use the same base name for each component of the Shapefile:
-                mv_file(file.path.to_str().unwrap(), destination_file);
-                // Only store the path of the .shp file:
-                if parts.len() > 1 && parts[1] == "shp" {
-                    is_shapefile = true;
-                    path = destination_file.to_string();
-                    real_name = parts[0].to_string();
-                }
-            },
-            _ => {  }
-        };
+        if let Value::File(ref file) = f {
+            let file_name = file.filename.clone().unwrap();
+            let parts = file_name.split('.').collect::<Vec<&str>>();
+            let destination_file = &{ String::from("/tmp/") + &random_name + "." + parts[1]};
+            // Use the same base name for each component of the Shapefile:
+            mv_file(file.path.to_str().unwrap(), destination_file);
+            // Only store the path of the .shp file:
+            if parts.len() > 1 && parts[1] == "shp" {
+                is_shapefile = true;
+                path = destination_file.to_string();
+                real_name = parts[0].to_string();
+            }
+        }
     }
     if is_shapefile {
         Some(TempFile { path: path, name: real_name, multiple_file: true })
@@ -242,12 +241,13 @@ fn get_gdal_version() -> String {
 
 
 // Files have been moved if input was Shapefile; now delete them:
-fn remove_files(path: &str) {
-    fs::remove_file(path);
-    fs::remove_file(path.replace("shp", "dbf"));
-    fs::remove_file(path.replace("shp", "prj"));
-    fs::remove_file(path.replace("shp", "shx"));
-    fs::remove_file(path.replace("shp", "cpg"));
+fn remove_files(path: &str) -> Result<(), Error> {
+    fs::remove_file(path)?;
+    fs::remove_file(path.replace("shp", "dbf"))?;
+    fs::remove_file(path.replace("shp", "prj"))?;
+    fs::remove_file(path.replace("shp", "shx"))?;
+    fs::remove_file(path.replace("shp", "cpg"))?;
+    Ok(())
 }
 
 // Wrapper arround mv command:
